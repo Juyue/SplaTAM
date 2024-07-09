@@ -17,6 +17,7 @@ scene_radius_depth_ratio = 2
 
 group_name = "TUM"
 run_name = f"{scene_name}_seed{seed}"
+homedir = os.path.expanduser("~")
 
 config = dict(
     workdir=f"./experiments/{group_name}",
@@ -36,7 +37,7 @@ config = dict(
     checkpoint_time_idx=0,
     save_checkpoints=False, # Save Checkpoints
     checkpoint_interval=100, # Checkpoint Interval
-    use_wandb=True,
+    use_wandb=False,
     wandb=dict(
         entity="theairlab",
         project="SplaTAM",
@@ -46,7 +47,8 @@ config = dict(
         eval_save_qual=True,
     ),
     data=dict(
-        basedir="./data/TUM_RGBD",
+        # basedir="./data/TUM_RGBD",
+        basedir=f"{homedir}/datasets/tum",
         gradslam_data_cfg=f"./configs/data/TUM/{scene_name}.yaml",
         sequence=f"rgbd_dataset_{scene_name}",
         desired_image_height=480,
@@ -55,6 +57,7 @@ config = dict(
         end=-1,
         stride=1,
         num_frames=-1,
+        # num_frames=10,
     ),
     tracking=dict(
         use_gt_poses=False, # Use GT Poses for Tracking

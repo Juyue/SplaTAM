@@ -1010,5 +1010,5 @@ if __name__ == "__main__":
     if not experiment.config['load_checkpoint']:
         os.makedirs(results_dir, exist_ok=True)
         shutil.copy(args.experiment, os.path.join(results_dir, "config.py"))
-
+    
     rgbd_slam(experiment.config)

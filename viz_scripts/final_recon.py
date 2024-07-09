@@ -21,6 +21,7 @@ from utils.recon_helpers import setup_camera
 from utils.slam_helpers import get_depth_and_silhouette
 from utils.slam_external import build_rotation
 
+# o3d.visualization.webrtc_server.enable_webrtc()
 
 def load_camera(cfg, scene_path):
     all_params = dict(np.load(scene_path, allow_pickle=True))
@@ -180,6 +181,7 @@ def visualize(scene_path, cfg):
     vis.create_window(width=int(cfg['viz_w'] * cfg['view_scale']), 
                       height=int(cfg['viz_h'] * cfg['view_scale']),
                       visible=True)
+    import pdb; pdb.set_trace()
 
     im, depth, sil = render(w2c, k, scene_data, scene_depth_data, cfg)
     init_pts, init_cols = rgbd2pcd(im, depth, w2c, k, cfg)

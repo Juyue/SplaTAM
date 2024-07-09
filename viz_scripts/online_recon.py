@@ -302,6 +302,8 @@ def visualize(scene_path, cfg):
         if not vis.poll_events():
             break
         vis.update_renderer()
+        vis.capture_screen_image(f"online_recon_{curr_timestep:05d}.jpg")
+
         prev_timestep = curr_timestep
         viz_start = False
 
