@@ -22,7 +22,7 @@ from tqdm import tqdm
 import wandb
 
 from datasets.gradslam_datasets import (load_dataset_config, ICLDataset, ReplicaDataset, ReplicaV2Dataset, AzureKinectDataset,
-                                        ScannetDataset, Ai2thorDataset, Record3DDataset, RealsenseDataset, TUMDataset,
+                                        ScannetDataset, Ai2thorDataset, Record3DDataset, RealsenseDatasetV2, TUMDataset,
                                         ScannetPPDataset, NeRFCaptureDataset)
 from utils.common_utils import seed_everything, save_params_ckpt, save_params
 from utils.eval_helpers import report_loss, report_progress, eval
@@ -53,7 +53,7 @@ def get_dataset(config_dict, basedir, sequence, **kwargs):
     elif config_dict["dataset_name"].lower() in ["record3d"]:
         return Record3DDataset(config_dict, basedir, sequence, **kwargs)
     elif config_dict["dataset_name"].lower() in ["realsense"]:
-        return RealsenseDataset(config_dict, basedir, sequence, **kwargs)
+        return RealsenseDatasetV2(config_dict, basedir, sequence, **kwargs)
     elif config_dict["dataset_name"].lower() in ["tum"]:
         return TUMDataset(config_dict, basedir, sequence, **kwargs)
     elif config_dict["dataset_name"].lower() in ["scannetpp"]:
@@ -263,7 +263,8 @@ def get_loss(params, curr_data, variables, iter_time_idx, loss_weights, use_sil_
     if ignore_outlier_depth_loss:
         depth_error = torch.abs(curr_data['depth'] - depth) * (curr_data['depth'] > 0)
         mask = (depth_error < 10*depth_error.median())
-        mask = mask & (curr_data['depth'] > 0)
+        # mask = mask & (curr_data['depth'] > 0)
+        mask = mask & (curr_data['depth'] > 0.28) # hardcoded for realsense435i
     else:
         mask = (curr_data['depth'] > 0)
     mask = mask & nan_mask

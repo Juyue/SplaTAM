@@ -69,3 +69,49 @@ class RealsenseDataset(GradSLAMDataset):
     def read_embedding_from_file(self, embedding_file_path):
         embedding = torch.load(embedding_file_path)
         return embedding.permute(0, 2, 3, 1)  # (1, H, W, embedding_dim)
+
+class RealsenseDatasetV2(GradSLAMDataset):
+    """
+    Dataset class to process depth images captured by realsense camera on the tabletop manipulator
+    """
+
+    def __init__(
+        self,
+        config_dict,
+        basedir,
+        sequence,
+        stride: Optional[int] = None,
+        start: Optional[int] = 0,
+        end: Optional[int] = -1,
+        desired_height: Optional[int] = 480,
+        desired_width: Optional[int] = 640,
+        load_embeddings: Optional[bool] = False,
+        embedding_dir: Optional[str] = "embeddings",
+        embedding_dim: Optional[int] = 512,
+        **kwargs,
+    ):
+        self.input_folder = os.path.join(basedir, sequence)
+        # only poses/images/depth corresponding to the realsense_camera_order are read/used
+        super().__init__(
+            config_dict,
+            stride=stride,
+            start=start,
+            end=end,
+            desired_height=desired_height,
+            desired_width=desired_width,
+            load_embeddings=load_embeddings,
+            embedding_dir=embedding_dir,
+            embedding_dim=embedding_dim,
+            **kwargs,
+        )
+
+    def get_filepaths(self):
+        color_paths = natsorted(glob.glob(os.path.join(self.input_folder, "color", "*.png")))
+        depth_paths = natsorted(glob.glob(os.path.join(self.input_folder, "depth", "*.png")))
+        embedding_paths = None
+        return color_paths, depth_paths, embedding_paths
+
+    def load_poses(self):
+        color_paths = natsorted(glob.glob(os.path.join(self.input_folder, "color", "*.png")))
+        poses = [torch.tensor([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]).float()] * len(color_paths)
+        return poses

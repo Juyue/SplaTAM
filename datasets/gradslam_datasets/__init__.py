@@ -6,7 +6,7 @@ from .icl import ICLDataset
 from .replica import ReplicaDataset, ReplicaV2Dataset
 from .scannet import ScannetDataset
 from .ai2thor import Ai2thorDataset
-from .realsense import RealsenseDataset
+from .realsense import RealsenseDataset, RealsenseDatasetV2
 from .record3d import Record3DDataset
 from .tum import TUMDataset
 from .scannetpp import ScannetPPDataset

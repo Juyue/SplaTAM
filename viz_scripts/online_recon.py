@@ -5,6 +5,8 @@ import time
 from importlib.machinery import SourceFileLoader
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# _VIS_DIR = os.path.expanduser("~/datasets/sync/SplaTAM/data_1_0_800_4/")
+_VIS_DIR = os.path.expanduser("~/datasets/sync/SplaTAM/data_1_800_1400_4/")
 
 sys.path.insert(0, _BASE_DIR)
 
@@ -22,6 +24,50 @@ from utils.common_utils import seed_everything
 from utils.recon_helpers import setup_camera
 from utils.slam_helpers import get_depth_and_silhouette
 from utils.slam_external import build_rotation
+from natsort import natsorted
+import glob
+import cv2
+from tqdm import tqdm
+
+MARGIN_WIDTH = 50
+
+def make_video(input_dir, fname_pattern, experiment_config):
+    # get raw input paths
+    data_cfg = experiment_config['data']
+    start, stride = data_cfg['start'], data_cfg['stride']
+    raw_video_path = os.path.join(data_cfg['basedir'], data_cfg['sequence'], "color_and_depth.mp4")
+
+    # 0. various paths
+    color_paths = natsorted(glob.glob(os.path.join(input_dir, f"*color.jpg")))
+    center_paths = natsorted(glob.glob(os.path.join(input_dir, f"*centers.jpg")))
+    output_video_path = os.path.join(input_dir, f"{fname_pattern}.mp4")
+    frame_width = 640 * 2 + MARGIN_WIDTH * 3
+    frame_height = 480 * 2 + MARGIN_WIDTH 
+
+    # 1. prepare video writer 
+    out_video_writer = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*"mp4v"), 15, (frame_width, frame_height))
+
+    # 3. create video, concatenate with raw video
+    raw_video = cv2.VideoCapture(raw_video_path)
+    pbar = tqdm(total=len(color_paths))
+    for _ in range(start):
+        ret, raw_frame = raw_video.read()
+    for color_filename, center_filename in zip(color_paths, center_paths):
+        ret, color_and_depth_image = raw_video.read()
+        
+        color_image =  cv2.imread(color_filename)  #BGR
+        center_image = cv2.imread(center_filename)  #BGR
+        split_region = np.ones((color_image.shape[0], MARGIN_WIDTH, 3), dtype=np.uint8) * 255
+        recon_combined = np.hstack((color_image, split_region, center_image, split_region, split_region))
+        split_region_wide = np.ones((MARGIN_WIDTH, frame_width, 3), dtype=np.uint8) * 255
+        combined = np.vstack((color_and_depth_image, split_region_wide, recon_combined))
+
+        out_video_writer.write(combined)
+        pbar.update(1)
+
+        for _ in range(stride-1):
+            ret, raw_frame = raw_video.read()
+    out_video_writer.release()
 
 
 def load_camera(cfg, scene_path):
@@ -234,15 +280,16 @@ def visualize(scene_path, cfg):
     num_timesteps = num_t
     viz_start = True
     curr_timestep = 0
-    while curr_timestep < (num_timesteps-1) or not cfg['enter_interactive_post_online']:
-        passed_time = time.time() - start_time
-        passed_frames = passed_time * cfg['viz_fps']
-        curr_timestep = int(passed_frames % num_timesteps)
-        if not viz_start:
-            if curr_timestep == prev_timestep:
-                continue
+    # while curr_timestep < (num_timesteps-1) or not cfg['enter_interactive_post_online']:
+    #     passed_time = time.time() - start_time
+    #     passed_frames = passed_time * cfg['viz_fps']
+    #     curr_timestep = int(passed_frames % num_timesteps)
+    #     if not viz_start:
+    #         if curr_timestep == prev_timestep:
+    #             continue
 
-        # Update Camera Frustum
+    #     # Update Camera Frustum
+    for curr_timestep in range(num_t):
         if curr_timestep == 0:
             cam_centers = []
             if not viz_start:
@@ -260,7 +307,8 @@ def visualize(scene_path, cfg):
             num_lines = [1]
             cols = []
             for line_t in range(curr_timestep):
-                cols.append(np.array(line_colormap((line_t * norm_factor / total_num_lines)+norm_factor)[:3]))
+                # cols.append(np.array(line_colormap((line_t * norm_factor / total_num_lines)+norm_factor)[:3]))
+                cols.append(np.array([1.0, 1.0, 1.0]))
             cols = np.array(cols)
             all_cols = [cols]
             out_pts = [np.array(cam_centers)]
@@ -302,43 +350,42 @@ def visualize(scene_path, cfg):
         if not vis.poll_events():
             break
         vis.update_renderer()
-        vis.capture_screen_image(f"online_recon_{curr_timestep:05d}.jpg")
+        vis.capture_screen_image(os.path.join(_VIS_DIR, f"online_recon_{curr_timestep:05d}_{cfg['render_mode']}.jpg"))
 
         prev_timestep = curr_timestep
         viz_start = False
 
-    # Enter Interactive Mode once all frames have been visualized
-    while True:
-        cam_params = view_control.convert_to_pinhole_camera_parameters()
-        view_k = cam_params.intrinsic.intrinsic_matrix
-        k = view_k / cfg['view_scale']
-        k[2, 2] = 1
-        w2c = cam_params.extrinsic
+    # # Enter Interactive Mode once all frames have been visualized
+    # while True:
+    #     cam_params = view_control.convert_to_pinhole_camera_parameters()
+    #     view_k = cam_params.intrinsic.intrinsic_matrix
+    #     k = view_k / cfg['view_scale']
+    #     k[2, 2] = 1
+    #     w2c = cam_params.extrinsic
 
-        if cfg['render_mode'] == 'centers':
-            pts = o3d.utility.Vector3dVector(scene_data['means3D'].contiguous().double().cpu().numpy())
-            cols = o3d.utility.Vector3dVector(scene_data['colors_precomp'].contiguous().double().cpu().numpy())
-        else:
-            im, depth, sil = render(w2c, k, scene_data, scene_depth_data, cfg)
-            if cfg['show_sil']:
-                im = (1-sil).repeat(3, 1, 1)
-            pts, cols = rgbd2pcd(im, depth, w2c, k, cfg)
+    #     if cfg['render_mode'] == 'centers':
+    #         pts = o3d.utility.Vector3dVector(scene_data['means3D'].contiguous().double().cpu().numpy())
+    #         cols = o3d.utility.Vector3dVector(scene_data['colors_precomp'].contiguous().double().cpu().numpy())
+    #     else:
+    #         im, depth, sil = render(w2c, k, scene_data, scene_depth_data, cfg)
+    #         if cfg['show_sil']:
+    #             im = (1-sil).repeat(3, 1, 1)
+    #         pts, cols = rgbd2pcd(im, depth, w2c, k, cfg)
         
-        # Update Gaussians
-        pcd.points = pts
-        pcd.colors = cols
-        vis.update_geometry(pcd)
+    #     # Update Gaussians
+    #     pcd.points = pts
+    #     pcd.colors = cols
+    #     vis.update_geometry(pcd)
 
-        if not vis.poll_events():
-            break
-        vis.update_renderer()
+    #     if not vis.poll_events():
+    #         break
+    #     vis.update_renderer()
     
     # Cleanup
     vis.destroy_window()
     del view_control
     del vis
     del render_options
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -361,6 +408,11 @@ if __name__ == "__main__":
     else:
         scene_path = experiment.config["scene_path"]
     viz_cfg = experiment.config["viz"]
+    # import pdb; pdb.set_trace()
 
     # Visualize Final Reconstruction
+    viz_cfg['render_mode'] = 'color'
     visualize(scene_path, viz_cfg)
+    viz_cfg['render_mode'] = 'centers'
+    visualize(scene_path, viz_cfg)
+    make_video(_VIS_DIR, "output", experiment.config)
